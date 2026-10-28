@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF to Word</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f4f4f6; --accent:#2f5bea; --err:#c62828; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141416; --fg:#f0f0f0; --muted:#9a9a9a; --card:#222226; --accent:#6b8cff; --err:#ff6b6b; }
+  }
+  body { font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg);
+         margin:0; padding:24px; display:flex; justify-content:center; }
+  main { width:100%; max-width:420px; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border-radius:14px; padding:20px; }
+  input[type=file] { width:100%; margin-bottom:14px; }
+  button { width:100%; padding:14px; font-size:1rem; border:0; border-radius:10px;
+           background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  #status { margin-top:14px; min-height:1.4em; color:var(--muted); }
+  #status.err { color:var(--err); }
+  a#dl { display:none; margin-top:12px; text-align:center; color:var(--accent); font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PDF to Word</h1>
+  <p class="sub">Works on normal and scanned PDFs.</p>
+  <div class="card">
+    <input type="file" id="file" accept="application/pdf,.pdf">
+    <button id="go">Convert</button>
+    <div id="status"></div>
+    <a id="dl">Download Word file</a>
+  </div>
+</main>
+<script>
+const file = document.getElementById('file');
+const go = document.getElementById('go');
+const status = document.getElementById('status');
+const dl = document.getElementById('dl');
+
+function say(msg, isErr) { status.textContent = msg; status.className = isErr ? 'err' : ''; }
+
+go.onclick = async () => {
+  if (!file.files[0]) { say('Choose a PDF first.', true); return; }
+  dl.style.display = 'none';
+  go.disabled = true;
+  say('Converting... scanned files can take a minute.');
+  try {
+    const form = new FormData();
+    form.append('file', file.files[0]);
+    const res = await fetch('/convert', { method: 'POST', body: form });
+    if (!res.ok) {
+      let detail = 'Something went wrong.';
+      try { detail = (await res.json()).detail || detail; } catch (e) {}
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    dl.href = URL.createObjectURL(blob);
+    dl.download = file.files[0].name.replace(/\.pdf$/i, '') + '.docx';
+    dl.style.display = 'block';
+    say(res.headers.get('X-Used-OCR') === 'true' ? 'Done (scan read with OCR).' : 'Done.');
+  } catch (e) {
+    say(e.message, true);
+  } finally {
+    go.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
